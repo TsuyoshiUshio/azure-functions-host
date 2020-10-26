@@ -11,13 +11,13 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
         /// The length in number of bytes of a <see cref="long"/>.
         /// It is used to specify the length (in the header) of content contained in a <see cref="SharedMemoryMap"/>.
         /// </summary>
-        public const int LengthNumBytes = sizeof(long);
+        public const int ContentLengthHeaderBytes = sizeof(long);
 
         /// <summary>
         /// Length of the header in number of bytes at the start of a <see cref="SharedMemoryMap"/>.
         /// Note: Whenever the header is modified to contain more/less information, this needs to be updated.
         /// </summary>
-        public const int HeaderTotalBytes = LengthNumBytes;
+        public const int HeaderTotalBytes = ContentLengthHeaderBytes;
 
         /// <summary>
         /// Minimum size an object must be in order for it to be transferred over shared memory.

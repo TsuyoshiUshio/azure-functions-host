@@ -14,14 +14,9 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
     /// </summary>
     public abstract class MemoryMappedFileAccessor : IMemoryMappedFileAccessor
     {
-        public MemoryMappedFileAccessor(ILogger logger)
-        {
-            Logger = logger;
-        }
-
         public MemoryMappedFileAccessor(ILoggerFactory loggerFactory)
         {
-            Logger = loggerFactory.CreateLogger("MemoryMappedFileAccessor");
+            Logger = loggerFactory.CreateLogger<MemoryMappedFileAccessor>();
         }
 
         protected ILogger Logger { get; }
@@ -55,7 +50,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
         /// <param name="mapName">Name of the <see cref="MemoryMappedFile"/>.</param>
         /// <returns>Path to the <see cref="MemoryMappedFile"/> if found an existing one
         /// <see cref="null"/> otherwise.</returns>
-        protected static string GetPath(string mapName)
+        protected string GetPath(string mapName)
         {
             // We escape the mapName to make it a valid file name
             // Python will use urllib.parse.quote_plus(mapName)
@@ -81,7 +76,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
         /// <param name="mapName">Name of the <see cref="MemoryMappedFile"/>.</param>
         /// <param name="size">Required size in the directory.</param>
         /// <returns>Created path.</returns>
-        protected static string CreatePath(string mapName, long size = 0)
+        protected string CreatePath(string mapName, long size)
         {
             // We escape the mapName to make it a valid file name
             // Python will use urllib.parse.quote_plus(mapName)
@@ -107,8 +102,8 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
         /// <param name="size">Required size in the directory.</param>
         /// <returns>Directory with enough space to create <see cref="MemoryMappedFile"/>.
         /// If none of them has enough free space, the
-        /// <see cref="MemoryMappedFileConstants.TempDirSuffix"/> is used.</returns>
-        protected static string GetDirectory(long size = 0)
+        /// <see cref="SharedMemoryConstants.TempDirSuffix"/> is used.</returns>
+        protected string GetDirectory(long size)
         {
             foreach (string tempDir in SharedMemoryConstants.TempDirs)
             {
@@ -124,8 +119,9 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
                         }
                     }
                 }
-                catch (ArgumentException)
+                catch (Exception exception)
                 {
+                    Logger.LogWarning(exception, $"Cannot get directory: {tempDir}");
                     continue;
                 }
             }

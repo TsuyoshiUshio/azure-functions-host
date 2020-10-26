@@ -11,19 +11,11 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
 {
     public class MemoryMappedFileAccessorWindows : MemoryMappedFileAccessor
     {
-        public MemoryMappedFileAccessorWindows(ILogger logger) : base(logger)
-        {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                throw new Exception($"Cannot instantiate on this platform");
-            }
-        }
-
         public MemoryMappedFileAccessorWindows(ILoggerFactory loggerFactory) : base(loggerFactory)
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                throw new Exception($"Cannot instantiate on this platform");
+                throw new PlatformNotSupportedException($"Cannot instantiate on this platform");
             }
         }
 

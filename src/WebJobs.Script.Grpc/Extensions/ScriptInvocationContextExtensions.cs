@@ -37,7 +37,7 @@ namespace Microsoft.Azure.WebJobs.Script.Grpc
                 if (isSharedMemoryDataTransferEnabled)
                 {
                     // Try to transfer this data over shared memory instead of RPC
-                    sharedMem = await input.val.ToRpcSharedMemory(logger, invocationRequest.InvocationId, sharedMemoryManager);
+                    sharedMem = await input.val.ToRpcSharedMemoryAsync(logger, invocationRequest.InvocationId, sharedMemoryManager);
                 }
 
                 if (sharedMem != null)

@@ -10,7 +10,7 @@ namespace Microsoft.Azure.WebJobs.Script.Grpc.Extensions
 {
     internal static class RpcSharedMemoryDataExtensions
     {
-        internal static async Task<RpcSharedMemory> ToRpcSharedMemory(this object value, ILogger logger, string invocationId, ISharedMemoryManager sharedMemoryManager)
+        internal static async Task<RpcSharedMemory> ToRpcSharedMemoryAsync(this object value, ILogger logger, string invocationId, ISharedMemoryManager sharedMemoryManager)
         {
             if (sharedMemoryManager.IsSupported(value))
             {
@@ -38,7 +38,7 @@ namespace Microsoft.Azure.WebJobs.Script.Grpc.Extensions
                 }
                 else
                 {
-                    logger.LogError($"Cannot write to shared memory for invocation: {invocationId}");
+                    logger.LogWarning($"Cannot write to shared memory for invocation: {invocationId}");
                 }
             }
 
@@ -50,6 +50,10 @@ namespace Microsoft.Azure.WebJobs.Script.Grpc.Extensions
             if (value is byte[])
             {
                 return RpcSharedMemoryDataType.Bytes;
+            }
+            else if (value is string)
+            {
+                return RpcSharedMemoryDataType.String;
             }
             else
             {

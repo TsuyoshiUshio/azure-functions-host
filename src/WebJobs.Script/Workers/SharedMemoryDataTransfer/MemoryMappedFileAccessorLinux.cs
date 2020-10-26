@@ -11,19 +11,11 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
 {
     public class MemoryMappedFileAccessorLinux : MemoryMappedFileAccessor
     {
-        public MemoryMappedFileAccessorLinux(ILogger logger) : base(logger)
-        {
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                throw new Exception($"Cannot instantiate on this platform");
-            }
-        }
-
         public MemoryMappedFileAccessorLinux(ILoggerFactory loggerFactory) : base(loggerFactory)
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                throw new Exception($"Cannot instantiate on this platform");
+                throw new PlatformNotSupportedException($"Cannot instantiate on this platform");
             }
         }
 
@@ -99,11 +91,8 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
 
             try
             {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                {
-                    string filePath = GetPath(mapName);
-                    File.Delete(filePath);
-                }
+                string filePath = GetPath(mapName);
+                File.Delete(filePath);
             }
             catch (Exception e)
             {

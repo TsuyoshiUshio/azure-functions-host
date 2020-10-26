@@ -11,6 +11,8 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
 
         Task<byte[]> GetBytesAsync(string mapName, long offset, long count);
 
+        Task<string> GetStringAsync(string mapName, long offset, long count);
+
         bool IsSupported(object input);
 
         void AddSharedMemoryMapForInvocation(string invocationId, string mapName);

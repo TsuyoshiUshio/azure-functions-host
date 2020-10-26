@@ -5,6 +5,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO.MemoryMappedFiles;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -12,6 +13,8 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
 {
     public class SharedMemoryManager : ISharedMemoryManager
     {
+        private readonly ILoggerFactory _loggerFactory;
+
         private readonly ILogger _logger;
 
         private readonly IMemoryMappedFileAccessor _mapAccessor;
@@ -23,17 +26,10 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
 
         private readonly ConcurrentDictionary<string, SharedMemoryMap> _allocatedSharedMemoryMaps;
 
-        public SharedMemoryManager(ILogger logger, IMemoryMappedFileAccessor mapAccessor)
-        {
-            _logger = logger;
-            _mapAccessor = mapAccessor;
-            _allocatedSharedMemoryMaps = new ConcurrentDictionary<string, SharedMemoryMap>();
-            _invocationSharedMemoryMaps = new ConcurrentDictionary<string, IList<string>>();
-        }
-
         public SharedMemoryManager(ILoggerFactory loggerFactory, IMemoryMappedFileAccessor mapAccessor)
         {
-            _logger = loggerFactory.CreateLogger("SharedMemoryManager");
+            _loggerFactory = loggerFactory;
+            _logger = _loggerFactory.CreateLogger<SharedMemoryManager>();
             _mapAccessor = mapAccessor;
             _allocatedSharedMemoryMaps = new ConcurrentDictionary<string, SharedMemoryMap>();
             _invocationSharedMemoryMaps = new ConcurrentDictionary<string, IList<string>>();
@@ -54,7 +50,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
 
             // Create shared memory map which can hold the content
             long contentSize = content.Length;
-            SharedMemoryMap sharedMemoryMap = Create(_logger, mapName, contentSize);
+            SharedMemoryMap sharedMemoryMap = Create(mapName, contentSize);
 
             // Ensure the shared memory map was created
             if (sharedMemoryMap != null)
@@ -87,11 +83,21 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
             return null;
         }
 
-        public async Task<SharedMemoryMetadata> PutObjectAsync(object input)
+        private Task<SharedMemoryMetadata> PutStringAsync(string content)
+        {
+            byte[] contentBytes = Encoding.UTF8.GetBytes(content);
+            return PutBytesAsync(contentBytes);
+        }
+
+        public Task<SharedMemoryMetadata> PutObjectAsync(object input)
         {
             if (input is byte[] arr)
             {
-                return await PutBytesAsync(arr);
+                return PutBytesAsync(arr);
+            }
+            else if (input is string str)
+            {
+                return PutStringAsync(str);
             }
             else
             {
@@ -119,7 +125,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
         /// </returns>
         public async Task<byte[]> GetBytesAsync(string mapName, long offset, long count)
         {
-            SharedMemoryMap sharedMemoryMap = Open(_logger, mapName);
+            SharedMemoryMap sharedMemoryMap = Open(mapName);
 
             try
             {
@@ -137,8 +143,14 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
             }
             finally
             {
-                sharedMemoryMap.DropReference();
+                sharedMemoryMap.Dispose(deleteFile: false);
             }
+        }
+
+        public async Task<string> GetStringAsync(string mapName, long offset, long count)
+        {
+            byte[] contentBytes = await GetBytesAsync(mapName, offset, count);
+            return Encoding.UTF8.GetString(contentBytes);
         }
 
         public bool TryFreeSharedMemoryMapsForInvocation(string invocationId)
@@ -181,16 +193,23 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
                     return true;
                 }
             }
+            else if (input is string str)
+            {
+                if (str.Length >= SharedMemoryConstants.MinObjectSizeForSharedMemoryTransfer)
+                {
+                    return true;
+                }
+            }
 
             return false;
         }
 
-        public SharedMemoryMap Create(ILogger logger, string mapName, long contentSize)
+        private SharedMemoryMap Create(string mapName, long contentSize)
         {
             long size = contentSize + SharedMemoryConstants.HeaderTotalBytes;
             if (_mapAccessor.TryCreate(mapName, size, out MemoryMappedFile mmf))
             {
-                return new SharedMemoryMap(logger, _mapAccessor, mapName, mmf);
+                return new SharedMemoryMap(_loggerFactory, _mapAccessor, mapName, mmf);
             }
             else
             {
@@ -198,11 +217,11 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
             }
         }
 
-        public SharedMemoryMap Open(ILogger logger, string mapName)
+        private SharedMemoryMap Open(string mapName)
         {
             if (_mapAccessor.TryOpen(mapName, out MemoryMappedFile mmf))
             {
-                return new SharedMemoryMap(logger, _mapAccessor, mapName, mmf);
+                return new SharedMemoryMap(_loggerFactory, _mapAccessor, mapName, mmf);
             }
             else
             {

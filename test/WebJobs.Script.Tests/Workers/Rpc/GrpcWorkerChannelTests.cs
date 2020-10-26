@@ -57,13 +57,13 @@ namespace Microsoft.Azure.WebJobs.Script.Tests.Workers.Rpc
             _testEnvironment = new TestEnvironment();
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                _mapAccessor = new MemoryMappedFileAccessorWindows(_logger);
+                _mapAccessor = new MemoryMappedFileAccessorWindows(_loggerFactory);
             }
             else
             {
-                _mapAccessor = new MemoryMappedFileAccessorLinux(_logger);
+                _mapAccessor = new MemoryMappedFileAccessorLinux(_loggerFactory);
             }
-            _sharedMemoryManager = new SharedMemoryManager(_logger, _mapAccessor);
+            _sharedMemoryManager = new SharedMemoryManager(_loggerFactory, _mapAccessor);
 
             var hostOptions = new ScriptApplicationHostOptions
             {

@@ -422,10 +422,24 @@ namespace Microsoft.Azure.WebJobs.Script.Grpc
             if (binding.RpcSharedMemory != null)
             {
                 // Data was transferred by the worker using shared memory
-                string mapName = binding.RpcSharedMemory.Name;
-                long offset = binding.RpcSharedMemory.Offset;
-                long count = binding.RpcSharedMemory.Count;
-                return await _sharedMemoryManager.GetBytesAsync(mapName, offset, count);
+                RpcSharedMemory sharedMem = binding.RpcSharedMemory;
+                string mapName = sharedMem.Name;
+                long offset = sharedMem.Offset;
+                long count = sharedMem.Count;
+
+                if (sharedMem.Type == RpcSharedMemoryDataType.Bytes)
+                {
+                    return await _sharedMemoryManager.GetBytesAsync(mapName, offset, count);
+                }
+                else if (sharedMem.Type == RpcSharedMemoryDataType.String)
+                {
+                    return await _sharedMemoryManager.GetStringAsync(mapName, offset, count);
+                }
+                else
+                {
+                    _workerChannelLogger.LogError($"Unsupported shared memory data type: {sharedMem.Type}");
+                    return null;
+                }
             }
             else
             {
@@ -490,17 +504,20 @@ namespace Microsoft.Azure.WebJobs.Script.Grpc
             // Free memory allocated by the host (for input bindings)
             if (!_sharedMemoryManager.TryFreeSharedMemoryMapsForInvocation(invocationId))
             {
-                _workerChannelLogger.LogError($"Cannot free all shared memory resources for invocation: {invocationId}");
+                _workerChannelLogger.LogWarning($"Cannot free all shared memory resources for invocation: {invocationId}");
             }
 
-            // Request to free memory allocated by the worker (for output bindings)
-            CloseSharedMemoryResourcesRequest closeSharedMemoryResourcesRequest = new CloseSharedMemoryResourcesRequest();
-            closeSharedMemoryResourcesRequest.MapNames.AddRange(outputMaps);
-
-            SendStreamingMessage(new StreamingMessage()
+            if (outputMaps.Any())
             {
-                CloseSharedMemoryResourcesRequest = closeSharedMemoryResourcesRequest
-            });
+                // Request to free memory allocated by the worker (for output bindings)
+                CloseSharedMemoryResourcesRequest closeSharedMemoryResourcesRequest = new CloseSharedMemoryResourcesRequest();
+                closeSharedMemoryResourcesRequest.MapNames.AddRange(outputMaps);
+
+                SendStreamingMessage(new StreamingMessage()
+                {
+                    CloseSharedMemoryResourcesRequest = closeSharedMemoryResourcesRequest
+                });
+            }
         }
 
         internal void Log(GrpcEvent msg)
@@ -663,6 +680,16 @@ namespace Microsoft.Azure.WebJobs.Script.Grpc
             return true;
         }
 
+        /// <summary>
+        /// Determine if shared memory transfer is enabled.
+        /// The following conditions must be met:
+        ///     1) <see cref="RpcWorkerConstants.FunctionsWorkerSharedMemoryDataTransferSettingName"/> must be set in environment variable (AppSetting).
+        ///     2) Worker must have the capability <see cref="RpcWorkerConstants.SharedMemoryDataTransfer"/>.
+        /// </summary>
+        /// <param name="logger">Logger.</param>
+        /// <param name="environment">Environment to check for the <see cref="RpcWorkerConstants.FunctionsWorkerSharedMemoryDataTransferSettingName"/> setting.</param>
+        /// <param name="capabilities">Worker capabilities to check for the <see cref="RpcWorkerConstants.SharedMemoryDataTransfer"/> capability.</param>
+        /// <returns><see cref="true"/> if shared memory data transfer is enabled, <see cref="false"/> otherwise.</returns>
         internal static bool IsSharedMemoryDataTransferEnabled(ILogger logger, IEnvironment environment, GrpcCapabilities capabilities)
         {
             // Check if the environment variable (AppSetting) has this feature enabled
@@ -681,7 +708,10 @@ namespace Microsoft.Azure.WebJobs.Script.Grpc
             else if (int.TryParse(envVal, out int intResult))
             {
                 // Check if value was specified as an int (1/0)
-                envValEnabled = intResult == 1;
+                if (intResult == 1)
+                {
+                    envValEnabled = true;
+                }
             }
             if (!envValEnabled)
             {

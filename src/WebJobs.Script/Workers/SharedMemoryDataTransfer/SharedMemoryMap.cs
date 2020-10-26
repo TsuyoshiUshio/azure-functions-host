@@ -4,7 +4,6 @@
 using System;
 using System.IO;
 using System.IO.MemoryMappedFiles;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -20,6 +19,8 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
     /// </summary>
     public class SharedMemoryMap : IDisposable
     {
+        private readonly ILoggerFactory _loggerFactory;
+
         private readonly ILogger _logger;
 
         /// <summary>
@@ -34,9 +35,10 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
 
         private readonly IMemoryMappedFileAccessor _mapAccessor;
 
-        public SharedMemoryMap(ILogger logger, IMemoryMappedFileAccessor mapAccessor, string mapName, MemoryMappedFile mmf)
+        public SharedMemoryMap(ILoggerFactory loggerFactory, IMemoryMappedFileAccessor mapAccessor, string mapName, MemoryMappedFile mmf)
         {
-            _logger = logger;
+            _loggerFactory = loggerFactory;
+            _logger = _loggerFactory.CreateLogger<SharedMemoryMap>();
             _mapName = mapName;
             _mmf = mmf;
             _mapAccessor = mapAccessor;
@@ -57,7 +59,7 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
             {
                 using (MemoryMappedViewStream mmv = _mmf.CreateViewStream())
                 {
-                    await mmv.WriteAsync(contentLengthBytes, 0, SharedMemoryConstants.LengthNumBytes);
+                    await mmv.WriteAsync(contentLengthBytes, 0, SharedMemoryConstants.ContentLengthHeaderBytes);
                     await content.CopyToAsync(mmv, SharedMemoryConstants.MinBufferSize);
                     await mmv.FlushAsync();
                 }
@@ -82,11 +84,11 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
         /// </summary>
         /// <param name="content"><see cref="byte[]"/> containing the content to write.</param>
         /// <returns>Number of bytes of content written.</returns>
-        public async Task<long> PutBytesAsync(byte[] content)
+        public Task<long> PutBytesAsync(byte[] content)
         {
             using (MemoryStream contentStream = new MemoryStream(content))
             {
-                return await PutStreamAsync(contentStream);
+                return PutStreamAsync(contentStream);
             }
         }
 
@@ -196,17 +198,22 @@ namespace Microsoft.Azure.WebJobs.Script.Workers.SharedMemoryDataTransfer
             return null;
         }
 
-        public void Dispose()
+        public void Dispose(bool deleteFile)
         {
-            _mapAccessor.Delete(_mapName, _mmf);
-        }
+            if (deleteFile)
+            {
+                _mapAccessor.Delete(_mapName, _mmf);
+            }
 
-        public void DropReference()
-        {
             if (_mmf != null)
             {
                 _mmf.Dispose();
             }
+        }
+
+        public void Dispose()
+        {
+            Dispose(deleteFile: true);
         }
 
         private async Task<long> ReadLongAsync(MemoryMappedViewStream mmv)
