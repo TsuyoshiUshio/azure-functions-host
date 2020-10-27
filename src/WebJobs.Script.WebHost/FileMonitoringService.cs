@@ -21,7 +21,7 @@ using IApplicationLifetime = Microsoft.AspNetCore.Hosting.IApplicationLifetime;
 
 namespace Microsoft.Azure.WebJobs.Script.WebHost
 {
-    public class FileMonitoringService : IHostedService, IDisposable
+    public class FileMonitoringService : IFileMonitoringService, IDisposable
     {
         private readonly ScriptJobHostOptions _scriptOptions;
         private readonly IScriptEventManager _eventManager;
@@ -39,10 +39,11 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
         private AutoRecoveringFileSystemWatcher _diagnosticModeFileWatcher;
         private FileWatcherEventSource _fileEventSource;
         private bool _shutdownScheduled;
-        private int _restartRequested;
+        private long _restartRequested;
         private bool _disposed = false;
         private bool _watchersStopped = false;
         private object _stopWatchersLock = new object();
+        private long _suspensionRequestsCount = 0;
 
         public FileMonitoringService(IOptions<ScriptJobHostOptions> scriptOptions, ILoggerFactory loggerFactory, IScriptEventManager eventManager, IApplicationLifetime applicationLifetime, IScriptHostManager scriptHostManager, IEnvironment environment)
         {
@@ -95,6 +96,37 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
         public Task StopAsync(CancellationToken cancellationToken)
         {
             StopFileWatchers();
+            return Task.CompletedTask;
+        }
+
+        public IDisposable SuspendRestart()
+        {
+            return new SuspendRestartRequest(this);
+        }
+
+        public void ResumeRestart()
+        {
+            Interlocked.Decrement(ref _suspensionRequestsCount);
+            _typedLogger.LogDebug($"Resuming restart. ({_suspensionRequestsCount} requests).");
+        }
+
+        public Task RestartAsync()
+        {
+            if (!_shutdownScheduled)
+            {
+                if (Interlocked.Read(ref _suspensionRequestsCount) > 0)
+                {
+                    _logger.LogDebug("Restart requested while currently suspended. Ignoring request.");
+                }
+                else
+                {
+                    if (Interlocked.Exchange(ref _restartRequested, 1) == 0)
+                    {
+                        return _scriptHostManager.RestartHostAsync();
+                    }
+                }
+            }
+
             return Task.CompletedTask;
         }
 
@@ -313,16 +345,6 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
             }
         }
 
-        private Task RestartAsync()
-        {
-            if (!_shutdownScheduled && Interlocked.Exchange(ref _restartRequested, 1) == 0)
-            {
-                return _scriptHostManager.RestartHostAsync();
-            }
-
-            return Task.CompletedTask;
-        }
-
         private void Shutdown()
         {
             _applicationLifetime.StopApplication();
@@ -367,6 +389,29 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                         File.Delete(path);
                     }
                 }, maxRetries: 3, retryInterval: TimeSpan.FromSeconds(1));
+            }
+        }
+
+        private class SuspendRestartRequest : IDisposable
+        {
+            private FileMonitoringService _fileMonitoringService;
+            private bool _disposed = false;
+
+            public SuspendRestartRequest(FileMonitoringService fileMonitoringService)
+            {
+                _fileMonitoringService = fileMonitoringService;
+                Interlocked.Increment(ref _fileMonitoringService._suspensionRequestsCount);
+                _fileMonitoringService._typedLogger.LogDebug($"Entering restart suspension scope. ({_fileMonitoringService._suspensionRequestsCount} requests).");
+            }
+
+            public void Dispose()
+            {
+                if (!_disposed)
+                {
+                    Interlocked.Decrement(ref _fileMonitoringService._suspensionRequestsCount);
+                    _fileMonitoringService._typedLogger.LogDebug($"Exiting restart suspension scope. ({_fileMonitoringService._suspensionRequestsCount} requests).");
+                    _disposed = true;
+                }
             }
         }
     }

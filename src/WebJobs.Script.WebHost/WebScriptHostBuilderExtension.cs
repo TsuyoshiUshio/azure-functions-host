@@ -130,7 +130,9 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                     services.AddSingleton<IEventCollectorProvider, FunctionInstanceLogCollectorProvider>();
 
                     // Hosted services
-                    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, FileMonitoringService>());
+                    services.AddSingleton<FileMonitoringService>();
+                    services.AddSingleton<IHostedService, FileMonitoringService>(serviceProvider => serviceProvider.GetService<FileMonitoringService>());
+                    services.AddSingleton<IFileMonitoringService, FileMonitoringService>(serviceProvider => serviceProvider.GetService<FileMonitoringService>());
 
                     ConfigureRegisteredBuilders(services, rootServiceProvider);
                 });
