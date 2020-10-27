@@ -45,6 +45,7 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost.DependencyInjection
                 .Expect<JobHostService>("Microsoft.Azure.WebJobs.Hosting.OptionsLoggingService")
                 .ExpectFactory<ExternalConfigurationStartupValidatorService>()
                 .Expect<PrimaryHostCoordinator>()
+                .Expect<FileMonitoringService>()
                 .Expect<WorkerConsoleLogService>()
                 .Expect<FunctionInvocationDispatcherShutdownManager>()
                 .Optional<ChangeAnalysisService>()

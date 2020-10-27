@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 using System;
+using System.Linq;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.Azure.WebJobs.Host.Config;
 using Microsoft.Azure.WebJobs.Host.Executors;
@@ -130,9 +131,8 @@ namespace Microsoft.Azure.WebJobs.Script.WebHost
                     services.AddSingleton<IEventCollectorProvider, FunctionInstanceLogCollectorProvider>();
 
                     // Hosted services
-                    services.AddSingleton<FileMonitoringService>();
-                    services.AddSingleton<IHostedService, FileMonitoringService>(serviceProvider => serviceProvider.GetService<FileMonitoringService>());
-                    services.AddSingleton<IFileMonitoringService, FileMonitoringService>(serviceProvider => serviceProvider.GetService<FileMonitoringService>());
+                    services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, FileMonitoringService>());
+                    services.AddSingleton<IFileMonitoringService, FileMonitoringService>(serviceProvider => (FileMonitoringService)serviceProvider.GetServices<IHostedService>().FirstOrDefault(x => x is FileMonitoringService));
 
                     ConfigureRegisteredBuilders(services, rootServiceProvider);
                 });
