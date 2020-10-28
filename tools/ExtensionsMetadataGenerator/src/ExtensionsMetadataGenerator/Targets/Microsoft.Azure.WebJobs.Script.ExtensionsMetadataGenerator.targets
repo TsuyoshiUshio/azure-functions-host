@@ -9,6 +9,7 @@
     <_FunctionsExtensionsDir Condition="$(_IsFunctionsSdkBuild) == 'true'">$(_FunctionsExtensionsDir)bin</_FunctionsExtensionsDir>
     <_ExtensionsMetadataGeneratorTargetsImported>true</_ExtensionsMetadataGeneratorTargetsImported>
     <IsPackable>false</IsPackable>
+    <_FunctionsSkipCleanOutput Condition="$(FunctionsSkipCleanOutput) == 'true' Or $(_FunctionsSkipCleanOutput) == 'true'">true</_FunctionsSkipCleanOutput>
     
     <!-- If the Sdk is present, we want to make sure that we generate extension metadata (extensions.json) and clean the output after
            the function metdata (function.json) has been generated. If not, we may delete files that function generation needs.
@@ -21,11 +22,11 @@
              AssemblyFile="$(_FunctionsExtensionsTaskAssemblyFullPath)"/>
   
   <Target Name="_FunctionsBuildCleanOutput" AfterTargets="_GenerateFunctionsExtensionsMetadataPostBuild" Condition="$(_FunctionsSkipCleanOutput) != 'true'" >
-    <RemoveRuntimeDependencies OutputPath="$(TargetDir)bin"/>
+    <RemoveRuntimeDependencies OutputPath="$(TargetDir)bin" FilesToSkip="@(FunctionsSkipCleanOutputAssembly)"/>
   </Target>
 
   <Target Name="_FunctionsPublishCleanOutput" AfterTargets="_GenerateFunctionsExtensionsMetadataPostPublish" Condition="$(_FunctionsSkipCleanOutput) != 'true'" >
-    <RemoveRuntimeDependencies OutputPath="$(PublishDir)bin"/>
+    <RemoveRuntimeDependencies OutputPath="$(PublishDir)bin" FilesToSkip="@(FunctionsSkipCleanOutputAssembly)"/>
   </Target>
   
   <UsingTask TaskName="GenerateFunctionsExtensionsMetadata"

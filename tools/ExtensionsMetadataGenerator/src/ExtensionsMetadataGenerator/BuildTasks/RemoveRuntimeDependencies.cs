@@ -21,8 +21,17 @@ namespace Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator.BuildTasks
         [Required]
         public string OutputPath { get; set; }
 
+        [Required]
+        public ITaskItem[] FilesToSkip { get; set; }
+
         public override bool Execute()
         {
+            HashSet<string> filesToSkipSet = new HashSet<string>();
+            foreach (ITaskItem item in FilesToSkip)
+            {
+                filesToSkipSet.Add(item.ItemSpec);
+            }
+
             Assembly assembly = typeof(RemoveRuntimeDependencies).Assembly;
             using (Stream resource = assembly.GetManifestResourceStream(assembly.GetName().Name + ".runtimeassemblies.txt"))
             using (var reader = new StreamReader(resource))
@@ -32,7 +41,7 @@ namespace Microsoft.Azure.WebJobs.Script.ExtensionsMetadataGenerator.BuildTasks
                 {
                     string fileName = Path.Combine(OutputPath, assemblyName);
 
-                    if (File.Exists(fileName))
+                    if (File.Exists(fileName) && !filesToSkipSet.Contains(assemblyName))
                     {
                         File.Delete(fileName);
                     }
