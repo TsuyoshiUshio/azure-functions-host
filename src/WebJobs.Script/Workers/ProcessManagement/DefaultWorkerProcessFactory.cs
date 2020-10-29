@@ -58,10 +58,11 @@ namespace Microsoft.Azure.WebJobs.Script.Workers
                 }
                 startInfo.Arguments = SanitizeExpandedArgument(startInfo.Arguments);
             }
-            Console.WriteLine("***************************** startInfo start");
-            var json = JsonConvert.SerializeObject(startInfo);
-            Console.WriteLine(json);
-            Console.WriteLine("***************************** startInfo end");
+            _logger.LogInformation("***************************** startInfo start");
+            _logger.LogInformation($"Arugument: {startInfo.Arguments}");
+            _logger.LogInformation($"WorkingDirectory: {startInfo.WorkingDirectory}");
+            _logger.LogInformation($"FileName: {startInfo.FileName}");
+            _logger.LogInformation("***************************** startInfo end");
             return new Process { StartInfo = startInfo };
         }
 
