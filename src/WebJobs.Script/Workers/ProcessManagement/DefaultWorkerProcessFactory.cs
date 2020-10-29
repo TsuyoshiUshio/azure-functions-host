@@ -7,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace Microsoft.Azure.WebJobs.Script.Workers
 {
@@ -57,6 +58,10 @@ namespace Microsoft.Azure.WebJobs.Script.Workers
                 }
                 startInfo.Arguments = SanitizeExpandedArgument(startInfo.Arguments);
             }
+            Console.WriteLine("***************************** startInfo start");
+            var json = JsonConvert.SerializeObject(startInfo);
+            Console.WriteLine(json);
+            Console.WriteLine("***************************** startInfo end");
             return new Process { StartInfo = startInfo };
         }
 
